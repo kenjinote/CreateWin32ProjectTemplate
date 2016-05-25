@@ -1,4 +1,4 @@
-#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+ï»¿#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 #pragma comment(lib, "shlwapi")
 
@@ -85,9 +85,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{
 	case WM_CREATE:
-		hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("ƒvƒƒWƒFƒNƒg–¼"), WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		hButton = CreateWindow(TEXT("BUTTON"), TEXT("ƒeƒ“ƒvƒŒ[ƒgì¬"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 0, 0, hWnd, (HMENU)IDOK, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		hCheck = CreateWindow(TEXT("BUTTON"), TEXT("ì¬Œã Visual Studio ‚ğŠJ‚­(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ãƒˆå"), WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		hButton = CreateWindow(TEXT("BUTTON"), TEXT("ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆä½œæˆ"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 0, 0, hWnd, (HMENU)IDOK, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		hCheck = CreateWindow(TEXT("BUTTON"), TEXT("ä½œæˆå¾Œ Visual Studio ã‚’é–‹ã(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
 		SendMessage(hCheck, BM_SETCHECK, BST_CHECKED, 0);
 		break;
 	case WM_SIZE:
@@ -191,7 +191,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPreInst, LPSTR pCmdLine, int 
 	RegisterClass(&wndclass);
 	HWND hWnd = CreateWindow(
 		szClassName,
-		TEXT("ƒvƒƒWƒFƒNƒgİ’è‚³‚ê‚½Visual Studio 2015‚ÌƒvƒƒWƒFƒNƒg‚Ìƒeƒ“ƒvƒŒ[ƒg‚ğƒfƒXƒNƒgƒbƒv‚Éo—Í"),
+		TEXT("ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ãƒˆè¨­å®šã•ã‚ŒãŸVisual Studio 2015ã®ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ãƒˆã®ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆã‚’ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ã«å‡ºåŠ›"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		0,
