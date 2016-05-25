@@ -81,19 +81,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	static HWND hEdit;
 	static HWND hButton;
-	static HWND hCheck;
+	static HWND hOpenCheck;
+	static HWND hBuildCheck;
 	switch (msg)
 	{
 	case WM_CREATE:
 		hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("プロジェクト名"), WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
 		hButton = CreateWindow(TEXT("BUTTON"), TEXT("テンプレート作成"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 0, 0, hWnd, (HMENU)IDOK, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		hCheck = CreateWindow(TEXT("BUTTON"), TEXT("作成後 Visual Studio を開く(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		SendMessage(hCheck, BM_SETCHECK, BST_CHECKED, 0);
+		hBuildCheck = CreateWindow(TEXT("BUTTON"), TEXT("ビルドする(&B)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		SendMessage(hBuildCheck, BM_SETCHECK, BST_CHECKED, 0);
+		hOpenCheck = CreateWindow(TEXT("BUTTON"), TEXT("Visual Studio で開く(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		SendMessage(hOpenCheck, BM_SETCHECK, BST_CHECKED, 0);
 		break;
 	case WM_SIZE:
 		MoveWindow(hEdit, 10, 10, 256, 32, TRUE);
 		MoveWindow(hButton, 10, 50, 256, 32, TRUE);
-		MoveWindow(hCheck, 10, 90, 256, 32, TRUE);
+		MoveWindow(hBuildCheck, 10, 90, 256, 32, TRUE);
+		MoveWindow(hOpenCheck, 10, 130, 256, 32, TRUE);
 		break;
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDOK)
@@ -126,33 +130,49 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					lstrcat(szOutputFilePath, TEXT(".filters"));
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_FILTERS1), TEXT("FILTERS"), szOutputFilePath);
 
-					if (SendMessage(hCheck, BM_GETCHECK, 0, 0))
+					TCHAR szSolutionFilePath[MAX_PATH];
+					lstrcpy(szSolutionFilePath, szDirectory);
+					PathAppend(szSolutionFilePath, szProjectName);
+					lstrcat(szSolutionFilePath, TEXT(".sln"));
+
+					TCHAR szVisualStudioPath[MAX_PATH];
+					HKEY hKey;
+					DWORD dwPosition;
+					DWORD dwType = REG_SZ;
+					DWORD dwByte = MAX_PATH * sizeof(TCHAR);
+					if (SendMessage(hBuildCheck, BM_GETCHECK, 0, 0))
 					{
-						TCHAR szVisualStudioPath[MAX_PATH];
-						HKEY hKey;
-						DWORD dwPosition;
-						DWORD dwType = REG_SZ;
-						DWORD dwByte = MAX_PATH * sizeof(TCHAR);
+						if (RegCreateKeyEx(HKEY_LOCAL_MACHINE,
+#ifdef _WIN64
+							TEXT("SOFTWARE\\WOW6432Node\\Microsoft\\MSBuild\\14.0"),
+#else
+							TEXT("SOFTWARE\\Microsoft\\VisualStudio\\14.0\\Setup\\vs"),
+#endif
+							0, 0, 0, KEY_READ, 0, &hKey, &dwPosition) == ERROR_SUCCESS)
+						{
+							if (RegQueryValueEx(hKey, TEXT("MSBuildOverrideTasksPath"), NULL, &dwType, (BYTE *)szVisualStudioPath, &dwByte) == ERROR_SUCCESS)
+							{
+								PathAppend(szVisualStudioPath, TEXT("MSBuild.exe"));
+								TCHAR szParameters[1024];
+								wsprintf(szParameters, TEXT("%s /t:Build /p:Configuration=Release;Platform=x86"), szSolutionFilePath);
+								ShellExecute(NULL, TEXT("open"), szVisualStudioPath, szParameters, NULL, SW_SHOWNORMAL);
+							}
+							RegCloseKey(hKey);
+						}
+					}
+					if (SendMessage(hOpenCheck, BM_GETCHECK, 0, 0))
+					{
 						if (RegCreateKeyEx(HKEY_LOCAL_MACHINE,
 #ifdef _WIN64
 							TEXT("SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\14.0\\Setup\\vs"),
 #else
 							TEXT("SOFTWARE\\Microsoft\\VisualStudio\\14.0\\Setup\\vs"),
 #endif
-							0,
-							0,
-							REG_OPTION_NON_VOLATILE,
-							KEY_READ,
-							NULL,
-							&hKey,
-							&dwPosition) == ERROR_SUCCESS)
+							0, 0, 0, KEY_READ, 0, &hKey, &dwPosition) == ERROR_SUCCESS)
 						{
 							if (RegQueryValueEx(hKey, TEXT("EnvironmentPath"), NULL, &dwType, (BYTE *)szVisualStudioPath, &dwByte) == ERROR_SUCCESS)
 							{
-								lstrcpy(szOutputFilePath, szDirectory);
-								PathAppend(szOutputFilePath, szProjectName);
-								lstrcat(szOutputFilePath, TEXT(".sln"));
-								ShellExecute(NULL, TEXT("open"), szVisualStudioPath, szOutputFilePath, NULL, SW_SHOWNORMAL);
+								ShellExecute(NULL, TEXT("open"), szVisualStudioPath, szSolutionFilePath, NULL, SW_SHOWNORMAL);
 							}
 							RegCloseKey(hKey);
 						}
