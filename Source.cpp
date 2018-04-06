@@ -37,7 +37,7 @@ std::wstring Replace(std::wstring String1, std::wstring String2, std::wstring St
 	return String1;
 }
 
-BOOL ReplaceUTF8File(LPCTSTR pszFileName, LPCTSTR lpszProjectName)
+BOOL ReplaceFile(LPCTSTR pszFileName, LPCTSTR lpszFrom, LPCTSTR lpszTo)
 {
 	HANDLE hFile = CreateFile(pszFileName, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	if (hFile == INVALID_HANDLE_VALUE)
@@ -46,30 +46,45 @@ BOOL ReplaceUTF8File(LPCTSTR pszFileName, LPCTSTR lpszProjectName)
 	}
 	else
 	{
-		SetFilePointer(hFile, 3, 0, FILE_BEGIN);
+		BOOL bBom = FALSE;
+		BYTE BOM[3] = { 0 };
+		{
+			DWORD dwRead;
+			ReadFile(hFile, BOM, 3, &dwRead, 0);
+			if (BOM[0] == 0xEF && BOM[1] == 0xBB && BOM[2] == 0xBF)
+			{
+				bBom = TRUE;
+			}
+		}
+		if (bBom)
+		{
+			SetFilePointer(hFile, 3, 0, FILE_BEGIN);
+		}
 		DWORD dwSize;
 		const DWORD dwFileSize = GetFileSize(hFile, 0);
-		LPSTR lpszText = (LPSTR)GlobalAlloc(0, dwFileSize - 2 + 1);
-		ReadFile(hFile, lpszText, dwFileSize - 2, &dwSize, 0);
+		LPSTR lpszText = (LPSTR)GlobalAlloc(0, dwFileSize + 1);
+		ReadFile(hFile, lpszText, dwFileSize, &dwSize, 0);
 		CloseHandle(hFile);
 		lpszText[dwSize] = 0;
-		DWORD len = MultiByteToWideChar(CP_UTF8, 0, lpszText, -1, 0, 0);
+		DWORD len = MultiByteToWideChar(bBom ? CP_UTF8 : 932, 0, lpszText, -1, 0, 0);
 		LPWSTR pwsz = (LPWSTR)GlobalAlloc(0, len * sizeof(WCHAR));
-		MultiByteToWideChar(CP_UTF8, 0, lpszText, -1, pwsz, len);
+		MultiByteToWideChar(bBom ? CP_UTF8 : 932, 0, lpszText, -1, pwsz, len);
 		GlobalFree(lpszText);
 		std::wstring str(pwsz);
 		GlobalFree(pwsz);
-		str = Replace(str, TEXT("XXXXX"), lpszProjectName);
+		str = Replace(str, lpszFrom, lpszTo);
 		hFile = CreateFile(pszFileName, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 		if (hFile == INVALID_HANDLE_VALUE)
 		{
 			return FALSE;
 		}
-		const BYTE BOM[3] = { 0xEF, 0xBB, 0xBF };
-		WriteFile(hFile, BOM, 3, &dwSize, NULL);
-		len = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, 0, 0, 0, 0);
+		if (bBom)
+		{
+			WriteFile(hFile, BOM, 3, &dwSize, NULL);
+		}
+		len = WideCharToMultiByte(bBom ? CP_UTF8 : 932, 0, str.c_str(), -1, 0, 0, 0, 0);
 		char*psz = (char*)GlobalAlloc(GPTR, len * sizeof(char));
-		WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, psz, len, 0, 0);
+		WideCharToMultiByte(bBom ? CP_UTF8 : 932, 0, str.c_str(), -1, psz, len, 0, 0);
 		WriteFile(hFile, psz, lstrlenA(psz), &dwSize, 0);
 		GlobalFree(psz);
 		CloseHandle(hFile);
@@ -87,12 +102,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 		hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), 0, WS_VISIBLE | WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		SendMessage(hEdit, EM_SETCUEBANNER, 1, (LPARAM)TEXT("プロジェクト名の入力"));
 		hButton = CreateWindow(TEXT("BUTTON"), TEXT("テンプレート作成"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 0, 0, hWnd, (HMENU)IDOK, ((LPCREATESTRUCT)lParam)->hInstance, 0);
 		hBuildCheck = CreateWindow(TEXT("BUTTON"), TEXT("ビルドする(&B)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
 		SendMessage(hBuildCheck, BM_SETCHECK, BST_CHECKED, 0);
 		hOpenCheck = CreateWindow(TEXT("BUTTON"), TEXT("Visual Studio で開く(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
 		SendMessage(hOpenCheck, BM_SETCHECK, BST_CHECKED, 0);
-		SendMessage(hEdit, EM_SETCUEBANNER, 1, (LPARAM)TEXT("プロジェクト名の入力"));
 		break;
 	case WM_SIZE:
 		MoveWindow(hEdit, 10, 10, LOWORD(lParam) - 20, 32, TRUE);
@@ -117,16 +132,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_CPP1), TEXT("CPP"), szOutputFilePath);
 
 					lstrcpy(szOutputFilePath, szDirectory);
+					PathAppend(szOutputFilePath, TEXT("LICENSE.TXT"));
+					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_LICENSE1), TEXT("LICENSE"), szOutputFilePath);
+					{
+						TCHAR szYear[5];
+						SYSTEMTIME st;
+						GetLocalTime(&st);
+						wsprintf(szYear, TEXT("%04d"), st.wYear);
+						ReplaceFile(szOutputFilePath, TEXT("2018"), szYear);
+					}
+
+					lstrcpy(szOutputFilePath, szDirectory);
 					PathAppend(szOutputFilePath, szProjectName);
 					lstrcat(szOutputFilePath, TEXT(".sln"));
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_SLN1), TEXT("SLN"), szOutputFilePath);
-					ReplaceUTF8File(szOutputFilePath, szProjectName);
+					ReplaceFile(szOutputFilePath, TEXT("XXXXX"), szProjectName);
 
 					lstrcpy(szOutputFilePath, szDirectory);
 					PathAppend(szOutputFilePath, szProjectName);
 					lstrcat(szOutputFilePath, TEXT(".vcxproj"));
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_VCXPROJ1), TEXT("VCXPROJ"), szOutputFilePath);
-					ReplaceUTF8File(szOutputFilePath, szProjectName);
+					ReplaceFile(szOutputFilePath, TEXT("XXXXX"), szProjectName);
 
 					lstrcat(szOutputFilePath, TEXT(".filters"));
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_FILTERS1), TEXT("FILTERS"), szOutputFilePath);
