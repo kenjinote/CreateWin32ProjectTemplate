@@ -235,7 +235,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPreInst, LPSTR pCmdLine, int 
 	RegisterClass(&wndclass);
 	HWND hWnd = CreateWindow(
 		szClassName,
-		TEXT("プロジェクト設定されたVisual Studio 2015のプロジェクトのテンプレートをデスクトップに出力"),
+		TEXT("プロジェクト設定されたVisual Studio 2017のプロジェクトのテンプレートをデスクトップに出力"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		0,
