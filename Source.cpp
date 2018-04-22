@@ -1,8 +1,12 @@
 ﻿#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
+#pragma comment(lib, "uxtheme")
 #pragma comment(lib, "shlwapi")
 
 #include <windows.h>
+#include <uxtheme.h>
+#include <vsstyle.h>
+#include <vssym32.h>
 #include <shlwapi.h>
 #include <shlobj.h>
 #include <string>
@@ -97,23 +101,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	static HWND hEdit;
 	static HWND hButton;
 	static HWND hOpenCheck;
-	static HWND hBuildCheck;
+	static HFONT hFont;
+	static DOUBLE dControlHeight = 32.0;
 	switch (msg)
 	{
 	case WM_CREATE:
+		{
+			HTHEME hTheme = OpenThemeData(hWnd, VSCLASS_AEROWIZARD);
+			LOGFONT lf = { 0 };
+			GetThemeFont(hTheme, NULL, AW_HEADERAREA, 0, TMT_FONT, &lf);
+			hFont = CreateFontIndirectW(&lf);
+			dControlHeight = abs(lf.lfHeight * 1.8);
+			CloseThemeData(hTheme);
+		}
 		hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), 0, WS_VISIBLE | WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, 0);
 		SendMessage(hEdit, EM_SETCUEBANNER, 1, (LPARAM)TEXT("プロジェクト名の入力"));
 		hButton = CreateWindow(TEXT("BUTTON"), TEXT("テンプレート作成"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 0, 0, hWnd, (HMENU)IDOK, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		hBuildCheck = CreateWindow(TEXT("BUTTON"), TEXT("ビルドする(&B)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		SendMessage(hBuildCheck, BM_SETCHECK, BST_CHECKED, 0);
+		SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, 0);
 		hOpenCheck = CreateWindow(TEXT("BUTTON"), TEXT("Visual Studio で開く(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
+		SendMessage(hOpenCheck, WM_SETFONT, (WPARAM)hFont, 0);
 		SendMessage(hOpenCheck, BM_SETCHECK, BST_CHECKED, 0);
 		break;
 	case WM_SIZE:
-		MoveWindow(hEdit, 10, 10, LOWORD(lParam) - 20, 32, TRUE);
-		MoveWindow(hButton, 10, 50, 256, 32, TRUE);
-		MoveWindow(hBuildCheck, 10, 90, 256, 32, TRUE);
-		MoveWindow(hOpenCheck, 10, 130, 256, 32, TRUE);
+		MoveWindow(hEdit, 10, 10, LOWORD(lParam) - 20, (int)dControlHeight, TRUE);
+		MoveWindow(hButton, 10, (int)(dControlHeight + 20), 512, (int)dControlHeight, TRUE);
+		MoveWindow(hOpenCheck, 10, (int)(dControlHeight * 2 + 30), 512, (int)dControlHeight, TRUE);
 		break;
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDOK)
@@ -167,38 +180,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					DWORD dwPosition;
 					DWORD dwType = REG_SZ;
 					DWORD dwByte = MAX_PATH * sizeof(TCHAR);
-					if (SendMessage(hBuildCheck, BM_GETCHECK, 0, 0))
-					{
-						if (RegCreateKeyEx(HKEY_LOCAL_MACHINE,
-#ifdef _WIN64
-							TEXT("SOFTWARE\\WOW6432Node\\Microsoft\\MSBuild\\14.0"),
-#else
-							TEXT("SOFTWARE\\Microsoft\\VisualStudio\\14.0\\Setup\\vs"),
-#endif
-							0, 0, 0, KEY_READ, 0, &hKey, &dwPosition) == ERROR_SUCCESS)
-						{
-							if (RegQueryValueEx(hKey, TEXT("MSBuildOverrideTasksPath"), NULL, &dwType, (BYTE *)szVisualStudioPath, &dwByte) == ERROR_SUCCESS)
-							{
-								PathAppend(szVisualStudioPath, TEXT("MSBuild.exe"));
-								TCHAR szParameters[1024];
-								wsprintf(szParameters, TEXT("%s /t:Build /p:Configuration=Release;Platform=x86"), szSolutionFilePath);
-								ShellExecute(NULL, TEXT("open"), szVisualStudioPath, szParameters, NULL, SW_SHOWNORMAL);
-							}
-							RegCloseKey(hKey);
-						}
-					}
 					if (SendMessage(hOpenCheck, BM_GETCHECK, 0, 0))
 					{
 						if (RegCreateKeyEx(HKEY_LOCAL_MACHINE,
 #ifdef _WIN64
-							TEXT("SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\14.0\\Setup\\vs"),
+							TEXT("SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\SxS\\VS7"),
 #else
-							TEXT("SOFTWARE\\Microsoft\\VisualStudio\\14.0\\Setup\\vs"),
+							TEXT("SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7"),
 #endif
 							0, 0, 0, KEY_READ, 0, &hKey, &dwPosition) == ERROR_SUCCESS)
 						{
-							if (RegQueryValueEx(hKey, TEXT("EnvironmentPath"), NULL, &dwType, (BYTE *)szVisualStudioPath, &dwByte) == ERROR_SUCCESS)
+							if (RegQueryValueEx(hKey, TEXT("15.0"), NULL, &dwType, (BYTE *)szVisualStudioPath, &dwByte) == ERROR_SUCCESS)
 							{
+								PathAppend(szVisualStudioPath, TEXT("Common7"));
+								PathAppend(szVisualStudioPath, TEXT("IDE"));
+								PathAppend(szVisualStudioPath, TEXT("devenv.exe"));
 								ShellExecute(NULL, TEXT("open"), szVisualStudioPath, szSolutionFilePath, NULL, SW_SHOWNORMAL);
 							}
 							RegCloseKey(hKey);
@@ -212,6 +208,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		DestroyWindow(hWnd);
 		break;
 	case WM_DESTROY:
+		DeleteObject(hFont);
 		PostQuitMessage(0);
 		break;
 	default:
