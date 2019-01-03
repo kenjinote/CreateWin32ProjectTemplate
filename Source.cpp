@@ -12,6 +12,11 @@
 #include <string>
 #include "resource.h"
 
+#define DEFAULT_DPI 96
+#define SCALEX(X) MulDiv(X, uDpiX, DEFAULT_DPI)
+#define SCALEY(Y) MulDiv(Y, uDpiY, DEFAULT_DPI)
+#define POINT2PIXEL(PT) MulDiv(PT, uDpiY, 72)
+
 TCHAR szClassName[] = TEXT("Window");
 
 VOID MyCreateFileFromResource(TCHAR *szResourceName, TCHAR *szResourceType, TCHAR *szResFileName)
@@ -96,37 +101,71 @@ BOOL ReplaceFile(LPCTSTR pszFileName, LPCTSTR lpszFrom, LPCTSTR lpszTo)
 	return TRUE;
 }
 
+BOOL GetScaling(HWND hWnd, UINT* pnX, UINT* pnY)
+{
+	BOOL bSetScaling = FALSE;
+	const HMONITOR hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+	if (hMonitor)
+	{
+		HMODULE hShcore = LoadLibrary(TEXT("SHCORE"));
+		if (hShcore)
+		{
+			typedef HRESULT __stdcall GetDpiForMonitor(HMONITOR, int, UINT*, UINT*);
+			GetDpiForMonitor* fnGetDpiForMonitor = reinterpret_cast<GetDpiForMonitor*>(GetProcAddress(hShcore, "GetDpiForMonitor"));
+			if (fnGetDpiForMonitor)
+			{
+				UINT uDpiX, uDpiY;
+				if (SUCCEEDED(fnGetDpiForMonitor(hMonitor, 0, &uDpiX, &uDpiY)) && uDpiX > 0 && uDpiY > 0)
+				{
+					*pnX = uDpiX;
+					*pnY = uDpiY;
+					bSetScaling = TRUE;
+				}
+			}
+			FreeLibrary(hShcore);
+		}
+	}
+	if (!bSetScaling)
+	{
+		HDC hdc = GetDC(NULL);
+		if (hdc)
+		{
+			*pnX = GetDeviceCaps(hdc, LOGPIXELSX);
+			*pnY = GetDeviceCaps(hdc, LOGPIXELSY);
+			ReleaseDC(NULL, hdc);
+			bSetScaling = TRUE;
+		}
+	}
+	if (!bSetScaling)
+	{
+		*pnX = DEFAULT_DPI;
+		*pnY = DEFAULT_DPI;
+		bSetScaling = TRUE;
+	}
+	return bSetScaling;
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	static HWND hEdit;
 	static HWND hButton;
 	static HWND hOpenCheck;
 	static HFONT hFont;
-	static DOUBLE dControlHeight = 32.0;
+	static UINT uDpiX = DEFAULT_DPI, uDpiY = DEFAULT_DPI;
 	switch (msg)
 	{
 	case WM_CREATE:
-		{
-			HTHEME hTheme = OpenThemeData(hWnd, VSCLASS_AEROWIZARD);
-			LOGFONT lf = { 0 };
-			GetThemeFont(hTheme, NULL, AW_HEADERAREA, 0, TMT_FONT, &lf);
-			hFont = CreateFontIndirectW(&lf);
-			dControlHeight = abs(lf.lfHeight * 1.8);
-			CloseThemeData(hTheme);
-		}
 		hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), 0, WS_VISIBLE | WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, 0);
 		SendMessage(hEdit, EM_SETCUEBANNER, 1, (LPARAM)TEXT("プロジェクト名の入力"));
 		hButton = CreateWindow(TEXT("BUTTON"), TEXT("テンプレート作成"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 0, 0, hWnd, (HMENU)IDOK, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, 0);
 		hOpenCheck = CreateWindow(TEXT("BUTTON"), TEXT("Visual Studio で開く(&O)"), WS_VISIBLE | WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, hWnd, 0, ((LPCREATESTRUCT)lParam)->hInstance, 0);
-		SendMessage(hOpenCheck, WM_SETFONT, (WPARAM)hFont, 0);
 		SendMessage(hOpenCheck, BM_SETCHECK, BST_CHECKED, 0);
+		SendMessage(hWnd, WM_DPICHANGED, 0, 0);
 		break;
 	case WM_SIZE:
-		MoveWindow(hEdit, 10, 10, LOWORD(lParam) - 20, (int)dControlHeight, TRUE);
-		MoveWindow(hButton, 10, (int)(dControlHeight + 20), 512, (int)dControlHeight, TRUE);
-		MoveWindow(hOpenCheck, 10, (int)(dControlHeight * 2 + 30), 512, (int)dControlHeight, TRUE);
+		MoveWindow(hEdit, POINT2PIXEL(4), POINT2PIXEL(4), LOWORD(lParam) - POINT2PIXEL(8), (int)POINT2PIXEL(20), TRUE);
+		MoveWindow(hButton, POINT2PIXEL(4), (int)(POINT2PIXEL(4+20+4)), POINT2PIXEL(256), (int)POINT2PIXEL(20), TRUE);
+		MoveWindow(hOpenCheck, POINT2PIXEL(4), (int)(POINT2PIXEL(4+20+4+20+4)), POINT2PIXEL(256), (int)POINT2PIXEL(20), TRUE);
 		break;
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDOK)
@@ -204,6 +243,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		break;
+	case WM_NCCREATE:
+		{
+			const HMODULE hModUser32 = GetModuleHandle(TEXT("user32.dll"));
+			if (hModUser32)
+			{
+				typedef BOOL(WINAPI*fnTypeEnableNCScaling)(HWND);
+				const fnTypeEnableNCScaling fnEnableNCScaling = (fnTypeEnableNCScaling)GetProcAddress(hModUser32, "EnableNonClientDpiScaling");
+				if (fnEnableNCScaling)
+				{
+					fnEnableNCScaling(hWnd);
+				}
+			}
+		}
+		return DefWindowProc(hWnd, msg, wParam, lParam);
+	case WM_DPICHANGED:
+		GetScaling(hWnd, &uDpiX, &uDpiY);
+		DeleteObject(hFont);
+		hFont = CreateFontW(-POINT2PIXEL(10), 0, 0, 0, FW_NORMAL, 0, 0, 0, SHIFTJIS_CHARSET, 0, 0, 0, 0, L"MS Shell Dlg");
+		SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, 0);
+		SendMessage(hButton, WM_SETFONT, (WPARAM)hFont, 0);
+		SendMessage(hOpenCheck, WM_SETFONT, (WPARAM)hFont, 0);
+		break;
 	case WM_CLOSE:
 		DestroyWindow(hWnd);
 		break;
@@ -212,7 +273,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		break;
 	default:
-		return(DefDlgProc(hWnd, msg, wParam, lParam));
+		return DefDlgProc(hWnd, msg, wParam, lParam);
 	}
 	return 0;
 }
