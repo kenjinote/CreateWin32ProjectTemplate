@@ -67,8 +67,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		SendMessage(hWnd, WM_DPICHANGED, 0, 0);
 		break;
 	case WM_SIZE:
-		MoveWindow(hButton, 10, 10, 256, 32, TRUE);
-		MoveWindow(hEdit, 10, 50, LOWORD(lParam) - 20, HIWORD(lParam) - 60, TRUE);
+		MoveWindow(hButton, POINT2PIXEL(10), POINT2PIXEL(10), POINT2PIXEL(256), POINT2PIXEL(32), TRUE);
+		MoveWindow(hEdit, POINT2PIXEL(10), POINT2PIXEL(50), LOWORD(lParam) - POINT2PIXEL(20), HIWORD(lParam) - POINT2PIXEL(60), TRUE);
 		break;
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDOK)

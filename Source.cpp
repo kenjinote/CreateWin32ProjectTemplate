@@ -213,6 +213,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					lstrcpy(szSolutionFilePath, szDirectory);
 					PathAppend(szSolutionFilePath, szProjectName);
 					lstrcat(szSolutionFilePath, TEXT(".sln"));
+					PathQuoteSpaces(szSolutionFilePath);
 
 					TCHAR szVisualStudioPath[MAX_PATH];
 					HKEY hKey;
@@ -221,7 +222,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					DWORD dwByte = MAX_PATH * sizeof(TCHAR);
 					if (SendMessage(hOpenCheck, BM_GETCHECK, 0, 0))
 					{
+						BOOL bSuccess = FALSE;
+
 						if (RegCreateKeyEx(HKEY_LOCAL_MACHINE,
+							TEXT("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\devenv.exe"),
+							0, 0, 0, KEY_READ, 0, &hKey, &dwPosition) == ERROR_SUCCESS)
+						{
+							if (RegQueryValueEx(hKey, 0, NULL, &dwType, (BYTE*)szVisualStudioPath, &dwByte) == ERROR_SUCCESS)
+							{
+								PathUnquoteSpaces(szVisualStudioPath);
+								if (PathFileExists(szVisualStudioPath))
+								{
+									ShellExecute(NULL, TEXT("open"), szVisualStudioPath, szSolutionFilePath, NULL, SW_SHOWNORMAL);
+									bSuccess = TRUE;
+								}
+							}
+							RegCloseKey(hKey);
+						}
+
+						if (bSuccess == FALSE && RegCreateKeyEx(HKEY_LOCAL_MACHINE,
 #ifdef _WIN64
 							TEXT("SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\SxS\\VS7"),
 #else
