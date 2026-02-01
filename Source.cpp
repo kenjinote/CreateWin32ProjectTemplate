@@ -184,7 +184,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_CPP1), TEXT("CPP"), szOutputFilePath);
 
 					lstrcpy(szOutputFilePath, szDirectory);
-					PathAppend(szOutputFilePath, TEXT("LICENSE.TXT"));
+					PathAppend(szOutputFilePath, TEXT("LICENSE.txt"));
 					MyCreateFileFromResource(MAKEINTRESOURCE(IDR_LICENSE1), TEXT("LICENSE"), szOutputFilePath);
 					{
 						TCHAR szYear[5];

@@ -35,7 +35,7 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="res\LICENSE.TXT">
+    <Text Include="res\LICENSE.txt">
       <Filter>リソース ファイル</Filter>
     </Text>
     <Text Include="res\Source.cpp">
