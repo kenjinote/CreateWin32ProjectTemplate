@@ -315,7 +315,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPreInst, LPSTR pCmdLine, int 
 	RegisterClass(&wndclass);
 	HWND hWnd = CreateWindow(
 		szClassName,
-		TEXT("プロジェクト設定されたVisual Studio 2017/2019のプロジェクトのテンプレートをデスクトップに出力"),
+		TEXT("プロジェクト設定されたVisual Studio 2026のプロジェクトのテンプレートをデスクトップに出力"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		0,
